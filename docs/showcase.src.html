@@ -1,0 +1,260 @@
+<title>gphys 物理エンジン</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* レイアウト: 実験ノート。左に見出しの列、右に本文と図。狭い画面では1列 */
+:root {
+  --bg: #eef2f3;        /* 方眼紙の青みがかった白 */
+  --panel: #ffffff;
+  --ink: #1d2a3a;       /* 紺のインク */
+  --muted: #5a6878;
+  --line: #cfd8de;
+  --grid: #dde5e9;
+  --beak: #d98a1c;      /* ガチョウのくちばし = Goose */
+  --c: #3c6fb0;         /* 手書きの C */
+  --js: #8a8f2a;        /* JavaScript */
+  --naive: #c0465e;     /* 総当たり */
+  --code-bg: #f6f8f9;
+  --f-display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --f-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141b22; --panel: #1b242d; --ink: #e4ebf0; --muted: #9aa8b5; --line: #2e3b47; --grid: #24303b;
+    --beak: #f0a640; --c: #7aa6e0; --js: #c3c85a; --naive: #ee7f95; --code-bg: #11171d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141b22; --panel: #1b242d; --ink: #e4ebf0; --muted: #9aa8b5; --line: #2e3b47; --grid: #24303b;
+  --beak: #f0a640; --c: #7aa6e0; --js: #c3c85a; --naive: #ee7f95; --code-bg: #11171d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.75;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 64px;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: 40px; }
+header { display: grid; gap: 14px; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; color: var(--muted); }
+h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(34px, 6vw, 56px); line-height: 1.1; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+h1 small { display: block; font-family: var(--f-body); font-weight: 700; font-size: clamp(15px, 2vw, 18px); color: var(--muted); margin-top: 8px; letter-spacing: 0; }
+.lead { max-width: 62ch; margin: 0; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--f-mono); font-size: 13px; color: var(--muted); }
+.facts b { color: var(--ink); font-weight: 600; }
+section { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 24px; align-items: start; }
+section > h2 { font-family: var(--f-display); font-weight: 400; font-size: 22px; line-height: 1.3; margin: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); text-wrap: balance; }
+section > h2 span { display: block; font-family: var(--f-mono); font-size: 11px; letter-spacing: .1em; color: var(--beak); }
+.body { display: grid; gap: 18px; min-width: 0; }
+.body p { margin: 0; max-width: 66ch; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px 20px; min-width: 0; }
+pre { margin: 0; background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; overflow-x: auto; font-family: var(--f-mono); font-size: 13px; line-height: 1.6; }
+code { font-family: var(--f-mono); font-size: .92em; }
+.cm { color: var(--muted); }
+.kw { color: var(--beak); font-weight: 600; }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.step { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.step h3 { margin: 0; font-size: 15px; }
+.step h3 i { font-style: normal; font-family: var(--f-mono); color: var(--beak); margin-right: 6px; }
+.step p { font-size: 14px; color: var(--muted); }
+.cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.case { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.case img { width: 100%; border-radius: 4px; border: 1px solid var(--line); background: #faf6ee; image-rendering: pixelated; }
+.case h3 { margin: 0; font-size: 16px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+.case h3 em { font-style: normal; font-family: var(--f-mono); font-size: 12px; color: var(--muted); font-weight: 400; }
+.case p { font-size: 14px; }
+.case .where { font-size: 13px; color: var(--muted); }
+.case pre { font-size: 12px; padding: 10px 12px; }
+.result { font-family: var(--f-mono); font-size: 12.5px; border-left: 3px solid var(--beak); padding-left: 10px; color: var(--ink); }
+.chart { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font-family: var(--f-mono); font-size: 11px; }
+.chart .ax { stroke: var(--line); }
+.chart .gl { stroke: var(--grid); }
+.chart .budget { stroke: var(--beak); stroke-dasharray: 4 4; }
+.chart .budget-t { fill: var(--beak); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 13.5px; min-width: 560px; }
+th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 700; color: var(--muted); font-size: 12px; letter-spacing: .04em; }
+td.same { color: var(--beak); font-weight: 700; }
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.kpi { display: grid; gap: 2px; }
+.kpi b { font-family: var(--f-display); font-weight: 400; font-size: 30px; line-height: 1.2; }
+.kpi span { font-size: 13px; color: var(--muted); }
+ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; max-width: 66ch; }
+.note { font-size: 13px; color: var(--muted); }
+@media (max-width: 760px) {
+  section { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  section > h2 { position: static; }
+  .steps, .cases, .kpis { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">GOOSE v2026.3 ・ 2D 物理エンジン ・ 本体 1ファイル 約430行</div>
+    <h1>gphys<small>円がたくさん、ぶつかり合う。速く、同じ結果で。</small></h1>
+    <p class="lead">Goose で書いた、軽い 2D 物理エンジンです。円の剛体を、位置ベースの計算(PBD)と一様グリッドで動かします。ヒープ確保も外部ライブラリも使いません。同じ入力なら、いつも同じ結果になります。</p>
+    <div class="facts"><span>10万個 <b>17.0 ms</b>/フレーム</span><span>手書き C と <b>同じ速さ・同じ衝突数</b></span><span>Node より <b>1.3〜1.7倍</b> 速い</span><span>総当たりより <b>10〜53倍</b> 速い</span></div>
+  </header>
+
+  <section>
+    <h2><span>HOW TO USE</span>使い方</h2>
+    <div class="body">
+      <div class="steps">
+        <div class="step panel"><h3><i>1</i>世界を決める</h3><p>箱の大きさと、マスの大きさ。マスは いちばん大きい円の直径以上にします。</p><pre>gphys::world(0, 0, 100, 100, 1.0);
+gphys::gy = -9.8;</pre></div>
+        <div class="step panel"><h3><i>2</i>円を足す</h3><p>位置・半径・質量。質量 0 は動かない物体(釘・壁)になります。番号が返ります。</p><pre>let b = gphys::add(50, 80, 0.5, 1.0);
+gphys::add(50, 20, 0.5, 0.0);</pre></div>
+        <div class="step panel"><h3><i>3</i>進める・読む</h3><p>1フレームを小ステップに分けて進め、配列から位置と速さを読みます。</p><pre>gphys::step(1.0 / 60.0, 4);
+print(gphys::px[b], gphys::py[b]);</pre></div>
+      </div>
+      <pre><span class="cm">// 設定(どれも ふつうの変数)</span>
+gphys::restitution = <span class="kw">0.3</span>;   <span class="cm">// はね返り 0〜1</span>
+gphys::friction    = <span class="kw">0.4</span>;   <span class="cm">// 摩擦: 小ステップごとに、ずれる速さを減らす割合</span>
+gphys::damping     = <span class="kw">2.0</span>;   <span class="cm">// 空気抵抗(1秒あたり)</span>
+<span class="cm">// 便利な関数</span>
+gphys::explode(x, y, 届く半径, 強さ);   <span class="cm">// 爆発で吹き飛ばす</span>
+gphys::is_free(x, y, r);              <span class="cm">// そこに置けるか</span>
+gphys::reorder();                     <span class="cm">// 物体をメモリでも空間の順に並べ直す(uid で追える)</span>
+gphys::state_hash();                  <span class="cm">// 決定論の確認(対戦・リプレイの同期チェック)</span></pre>
+    </div>
+  </section>
+
+  <section>
+    <h2><span>CASES</span>事例</h2>
+    <div class="body">
+      <p>4つの事例は <code>examples/</code> にあります。どれも 3つの時刻を横に並べた絵です。動く円は、遅いとピンク、速いと黄色。紺は動かない物体です。</p>
+      <div class="cases">
+        <article class="case panel">
+          <h3>ゴルトンボード <em>動かない物体 3396 + 玉 2023</em></h3>
+          <img src="{{galton}}" alt="漏斗から落ちた玉が、釘の間を通って、下の仕切りに山の形に積もっていく3コマの絵">
+          <p>漏斗から落ちた玉が、釘にはじかれて左右に分かれ、下に正規分布の山を作ります。</p>
+          <p class="where">使いどころ: パチンコ・ピンボール・抽選の演出</p>
+          <pre>gphys::add(x, y, 0.45, 0.0);       <span class="cm">// 釘(動かない)</span>
+if gphys::is_free(x, y, r) { gphys::add(x, y, r, 1.0); }</pre>
+          <div class="result">1フレーム 2.13 ms(6小ステップ)</div>
+        </article>
+        <article class="case panel">
+          <h3>群衆 <em>敵 2000体 + 壁 69</em></h3>
+          <img src="{{crowd}}" alt="四すみから出た敵の群れが、真ん中の丸い本拠地へ向かい、入口で渋滞しながら取り囲む3コマの絵">
+          <p>四すみの敵が、丸い本拠地へ向かいます。向かう先はゲーム側が決め、物理は重ならないことだけを守ります。入口で渋滞が起きます。</p>
+          <p class="where">使いどころ: タワーディフェンス・RTS・ゾンビの群れ</p>
+          <pre>gphys::vx[i] += (dx / d * want - gphys::vx[i]) * 0.1;
+gphys::step(1.0 / 60.0, 4);</pre>
+          <div class="result">1フレーム 0.66 ms ・ 10秒後に中へ入れたのは 42体</div>
+        </article>
+        <article class="case panel">
+          <h3>砂山 <em>1200粒 × 2回</em></h3>
+          <img src="{{sand}}" alt="左に積んだ砂の柱が崩れる絵。摩擦なしでは右の壁まで流れ、摩擦0.4では斜面の山になる">
+          <p>左に積んだ柱を崩します。左の2コマは摩擦 0、右の2コマは摩擦 0.4。摩擦があると流れが止まり、斜面になります。</p>
+          <p class="where">使いどころ: 砂・豆・コイン・ガレキ</p>
+          <pre>gphys::friction = 0.4;</pre>
+          <div class="result">粒の90%が入る幅: 摩擦0 → x=96 / 摩擦0.4 → x=48</div>
+        </article>
+        <article class="case panel">
+          <h3>爆発 <em>玉 820</em></h3>
+          <img src="{{explosion}}" alt="三角に積んだ玉の山が、下の真ん中の爆発で吹き飛び、4秒後に床に散らばる3コマの絵">
+          <p>三角に積んだ山の下で爆発させます。中心に近いほど強く、重いほど弱く飛びます。</p>
+          <p class="where">使いどころ: 爆弾・衝撃波・ノックバック</p>
+          <pre>gphys::explode(50.0, 3.0, 14.0, 60.0);</pre>
+          <div class="result">448個を吹き飛ばした(直前・0.33秒後・4秒後)</div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span>SPEED</span>性能</h2>
+    <div class="body">
+      <p>同じ場面(箱の半分を円で埋めて、重力で落とす)を、同じアルゴリズムの4つの実装で測りました。1フレーム = 1/60秒を4小ステップ。3回の中央値です。</p>
+      <div class="kpis">
+        <div class="kpi panel"><b>17.0 ms</b><span>10万個の1フレーム(Goose)。60fps の予算 16.7 ms とほぼ同じ</span></div>
+        <div class="kpi panel"><b>±9%</b><span>Goose と手書きの C の差(以内)。衝突数は全部の規模でぴったり同じ</span></div>
+        <div class="kpi panel"><b>×53</b><span>5000個で、総当たり(O(n²))と比べた速さ。1000個では ×10</span></div>
+      </div>
+      <div class="panel">
+        <div class="legend" id="legend"></div>
+        <svg class="chart" id="chart" viewBox="0 0 720 380" role="img" aria-label="玉の数ごとの、1フレームの時間のグラフ(両方の軸が対数目盛り)"></svg>
+        <p class="note">横軸・縦軸とも対数目盛り。点線は 60fps の予算(16.7 ms)。総当たりは 5000個までしか測っていません(1万個以上は遅すぎるため)。</p>
+      </div>
+      <div class="panel tbl">
+        <table id="tbl"></table>
+      </div>
+      <p class="note">測った場所: このクラウドのコンテナ・1コア・gcc 13.3(-O2)・Node 22.22。同じ機械で他の処理も動いているため、値は回ごとに1〜2割ぶれます。お手元の機械では未確認です。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span>WHY FAST</span>速さのしくみ</h2>
+    <div class="body">
+      <ul class="plain">
+        <li><b>数え上げソートで整列</b>: 小ステップごとに、円をマスの順に並べた作業用の配列へ集めます(O(n))。近い円が、メモリでも近くなります。</li>
+        <li><b>調べるのは2区間だけ</b>: 「同じマス+右のマス」と「下の行の3マス」は、どちらもメモリ上で続いた1区間になります。半分の近傍だけ見るので、同じ組を2回調べません。</li>
+        <li><b>境界チェックをコンパイラに消させる</b>: マスの区間を Goose のインデックス型 <code>u32 upto sx</code> にしたので、いちばん熱いループに配列の範囲チェックが残りません。</li>
+        <li><b>相手だけメモリを読む</b>: 円 a の位置はローカル変数に置いたまま、相手の区間を回します。これで衝突の計算が 2.6 → 1.6 ms(10万個・1小ステップ)になりました。</li>
+        <li><b>確保ゼロ</b>: ステップ中に、メモリの確保も移動も起きません。</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2><span>LIMITS</span>できないこと</h2>
+    <div class="body">
+      <ul class="plain">
+        <li>形は円だけ。回転・箱・多角形・関節はありません。</li>
+        <li>深く積むと、少し揺れが残ります(2000個の山で、平均の速さ 0.2/秒)。小ステップを増やすと減ります。</li>
+        <li>1スレッドです。</li>
+        <li>物体を1つだけ消す関数はありません(<code>reset()</code> で全部消す)。</li>
+        <li>決定論は、同じ機械・同じコンパイラで確かめました(gcc と TinyCC でハッシュ一致)。別の CPU どうしでの一致は未確認です。</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+const S = [
+  { k: 'goose', name: 'Goose(gphys)', col: 'var(--beak)', pts: [[1000, .257], [5000, 1.257], [10000, 2.162], [50000, 8.216], [100000, 17.025]] },
+  { k: 'c', name: '手書きの C', col: 'var(--c)', pts: [[1000, .254], [5000, 1.156], [10000, 2.104], [50000, 8.567], [100000, 17.231]] },
+  { k: 'js', name: 'JavaScript(Node)', col: 'var(--js)', pts: [[1000, .329], [5000, 1.760], [10000, 3.403], [50000, 11.840], [100000, 29.304]] },
+  { k: 'naive', name: 'Goose 総当たり', col: 'var(--naive)', pts: [[1000, 2.643], [2000, 10.071], [5000, 66.462]] },
+];
+const CONTACTS = { goose: [6767, 33515, 68470, 47449, 66887], c: [6767, 33515, 68470, 47449, 66887], js: [6729, 33358, 68688, 48147, 66807] };
+const W = 720, H = 380, L = 56, R = 120, T = 16, B = 44;
+const lx = v => L + (Math.log10(v) - 3) / 2 * (W - L - R);
+const ly = v => T + (1 - (Math.log10(v) - Math.log10(.2)) / (Math.log10(100) - Math.log10(.2))) * (H - T - B);
+const svg = document.getElementById('chart'); let s = '';
+for (const v of [.2, .5, 1, 2, 5, 10, 20, 50, 100]) { const y = ly(v); s += `<line class="gl" x1="${L}" x2="${W - R}" y1="${y}" y2="${y}"/><text x="${L - 8}" y="${y + 4}" text-anchor="end">${v}</text>`; }
+for (const v of [1000, 2000, 5000, 10000, 20000, 50000, 100000]) { const x = lx(v); s += `<line class="gl" x1="${x}" x2="${x}" y1="${T}" y2="${H - B}"/><text x="${x}" y="${H - B + 18}" text-anchor="middle">${v >= 10000 ? v / 10000 + '万' : v.toLocaleString()}</text>`; }
+s += `<line class="ax" x1="${L}" x2="${L}" y1="${T}" y2="${H - B}"/><line class="ax" x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}"/>`;
+s += `<text x="${L}" y="${H - 6}">玉の数 →</text><text x="${L + 8}" y="${T + 12}">1フレームの ms ↑</text>`;
+const by = ly(16.7); s += `<line class="budget" x1="${L}" x2="${W - R}" y1="${by}" y2="${by}"/><text class="budget-t" x="${L + 8}" y="${by - 6}">60fps の予算 16.7 ms</text>`;
+for (const q of S) {
+  const d = q.pts.map(([n, ms], i) => `${i ? 'L' : 'M'}${lx(n).toFixed(1)},${ly(ms).toFixed(1)}`).join(' ');
+  s += `<path d="${d}" fill="none" stroke="${q.col}" stroke-width="2.5" stroke-linejoin="round"/>`;
+  for (const [n, ms] of q.pts) s += `<circle cx="${lx(n)}" cy="${ly(ms)}" r="3.5" fill="${q.col}"><title>${q.name} ${n}個: ${ms} ms</title></circle>`;
+  const [ln, lms] = q.pts[q.pts.length - 1];
+  const off = q.k === 'c' ? 12 : q.k === 'goose' ? -6 : 4;
+  s += `<text x="${lx(ln) + 8}" y="${ly(lms) + off}" style="fill:${q.col}">${lms} ms</text>`;
+}
+svg.innerHTML = s;
+document.getElementById('legend').innerHTML = S.map(q => `<span><i style="background:${q.col}"></i>${q.name}</span>`).join('');
+const N = [1000, 5000, 10000, 50000, 100000];
+let t = '<thead><tr><th>玉の数</th><th>Goose ms</th><th>C ms</th><th>JS ms</th><th>JS ÷ Goose</th><th>衝突数 Goose / C</th><th>総当たり ms</th></tr></thead><tbody>';
+const naive = { 1000: 2.643, 5000: 66.462 };
+N.forEach((n, i) => {
+  const g = S[0].pts[i][1], c = S[1].pts[i][1], j = S[2].pts[i][1];
+  const same = CONTACTS.goose[i] === CONTACTS.c[i];
+  t += `<tr><td>${n.toLocaleString()}</td><td>${g.toFixed(2)}</td><td>${c.toFixed(2)}</td><td>${j.toFixed(2)}</td><td>${(j / g).toFixed(2)}倍</td><td class="${same ? 'same' : ''}">${CONTACTS.goose[i].toLocaleString()} / ${CONTACTS.c[i].toLocaleString()}${same ? ' 一致' : ''}</td><td>${naive[n] ? naive[n].toFixed(2) + `(${(naive[n] / g).toFixed(0)}倍 遅い)` : '—'}</td></tr>`;
+});
+document.getElementById('tbl').innerHTML = t + '</tbody>';
+</script>
