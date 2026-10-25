@@ -1,0 +1,10 @@
+bench
+test
+compare/cmp
+compare/ref
+examples/galton
+examples/crowd
+examples/sand
+examples/explosion
+*.ppm
+*.c.tmp
